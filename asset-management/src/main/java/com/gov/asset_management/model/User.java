@@ -20,18 +20,19 @@ public class User {
     @Enumerated(EnumType.STRING)
     private Role role;
 
+    // --- NEW FIELDS FOR EMAIL AUTHENTICATION ---
+    private String email;       // Stores the user's email (e.g., rahulsribastabdas@gmail.com)
+    private String currentOtp;  // Temporarily holds the 6-digit code during login
+
     // Kept for backward compatibility with your frontend
     private String departmentName;
 
-    // --- Relationship Link (Optional for now, good for future) ---
     @ManyToOne
     @JoinColumn(name = "department_id")
     private Department department;
 
-    // Changed 'boolean' to 'Boolean' to ensure proper Getter generation
     private Boolean isActive = true;
 
-    // Explicit setter in case Lombok acts up
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
     }
