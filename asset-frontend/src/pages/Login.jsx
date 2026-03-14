@@ -13,12 +13,12 @@ const Login = () => {
   // DATA STATE
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('DEPT_HEAD'); // Default selection for UI
+  const [role, setRole] = useState('DEPT_HEAD'); 
   const [error, setError] = useState(''); 
   
   // OTP STATE
   const [otp, setOtp] = useState('');
-  const [tempUser, setTempUser] = useState(null); 
+  const [targetEmail, setTargetEmail] = useState(''); // Stores where the email was sent
 
   // --- STEP 1: CHECK CREDENTIALS ---
   const handleCredentialsCheck = async (e) => {
@@ -26,43 +26,23 @@ const Login = () => {
     setError('');
 
     try {
-      // 1. THE REAL BACKEND CALL
+      // 1. CALL THE NEW LOGIN API
       const response = await axios.post('http://localhost:8080/api/auth/login', {
         username: username,
         password: password
       });
 
-      console.log("CREDENTIALS VALID:", response.data);
-
-      // --- NEW JWT LOGIC ---
-      // The backend now returns { token, username, role }
-      const authenticatedData = response.data; 
-      const userRole = (authenticatedData.role || '').toUpperCase();
-
-      // 2. SECURITY CHECK: Tab Mismatch?
-      if (loginType === 'authority' && (userRole === 'EMPLOYEE' || userRole === 'GOVT_EMPLOYEE')) {
-          setError('Access Denied: Employees must use the "Employee" tab.');
-          return;
-      }
-      if (loginType === 'employee' && userRole !== 'EMPLOYEE' && userRole !== 'GOVT_EMPLOYEE') {
-          setError('Security Alert: Please use the "Official / Admin" tab.');
-          return;
-      }
-
-      // 3. DECIDE NEXT STEP
-      if (loginType === 'authority') {
-          // Authority -> Go to Step 2 (OTP)
-          // We temporarily hold the token and user info until OTP is verified
-          setTempUser(authenticatedData);
-          setStep(2);
+      // 2. CHECK IF BACKEND REQUIRES OTP
+      if (response.data.message === "OTP_REQUIRED") {
+          // Temporarily store the email to show the user
+          setTargetEmail(response.data.email || 'your registered email');
+          setStep(2); // Move to OTP screen
       } else {
-          // Employee -> Login Immediately
-          completeLogin(authenticatedData);
+          setError('Unexpected response from server.');
       }
 
     } catch (err) {
       console.error("Login Error:", err);
-      // Look for custom error messages from backend (like "Account pending admin approval")
       if (err.response && err.response.data) {
           setError(typeof err.response.data === 'string' ? err.response.data : 'Invalid Credentials');
       } else {
@@ -71,24 +51,34 @@ const Login = () => {
     }
   };
 
-  // --- STEP 2: VERIFY OTP ---
-  const handleOtpVerify = (e) => {
+  // --- STEP 2: VERIFY REAL OTP ---
+  const handleOtpVerify = async (e) => {
       e.preventDefault();
-      // Mock OTP Check
-      if (otp === '123456') {
-          completeLogin(tempUser);
-      } else {
-          setError('Invalid OTP. Access Denied.');
+      setError('');
+
+      try {
+          // 1. SEND OTP TO BACKEND
+          const response = await axios.post('http://localhost:8080/api/auth/verify-otp', {
+              username: username,
+              otp: otp
+          });
+
+          // 2. SUCCESS! We finally have the JWT token
+          console.log("OTP VALID! Token received.");
+          completeLogin(response.data);
+
+      } catch (err) {
+          console.error("OTP Error:", err);
+          setError('Invalid or Expired OTP. Access Denied.');
       }
   };
 
   // --- FINAL: SAVE & REDIRECT ---
   const completeLogin = (userData) => {
       
-      // --- NEW: SAVE THE JWT TOKEN ---
+      // Save the real JWT Token
       localStorage.setItem('token', userData.token); 
       
-      // Save other user details
       localStorage.setItem('user', JSON.stringify({ username: userData.username, role: userData.role }));
       localStorage.setItem('userRole', userData.role);
       localStorage.setItem('isLoggedIn', 'true');
@@ -102,12 +92,11 @@ const Login = () => {
           navigate('/super-admin');
       } else if (userRole === 'PROCUREMENT_OFFICER' || userRole === 'PO') {
           navigate('/procurement');
-      } else if (userRole === 'AUDITOR') {
+      } else if (userRole === 'CAG_AUDITOR' || userRole === 'AUDITOR') {
           navigate('/auditor');
       } else if (userRole === 'EMPLOYEE' || userRole === 'GOVT_EMPLOYEE') {
           navigate('/employee'); 
       } else {
-          // Fallback
           navigate('/');
       }
   };
@@ -245,11 +234,11 @@ const Login = () => {
                                    <option value="DEPT_HEAD">Dept. Head (Joint Secretary)</option>
                                    <option value="PROCUREMENT_OFFICER">Procurement Officer (PO)</option>
                                    <option value="SUPER_ADMIN">System Administrator (NIC)</option>
-                                   <option value="AUDITOR">CAG Auditor</option>
+                                   <option value="CAG_AUDITOR">CAG Auditor</option>
                                 </select>
                              </div>
                              <div>
-                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">User ID / Email</label>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">User ID</label>
                                 <input 
                                    type="text" 
                                    className="w-full border border-gray-300 rounded-md p-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-800" 
@@ -304,7 +293,7 @@ const Login = () => {
                       </div>
                       
                       <p className="text-xs text-gray-500">
-                          Secure OTP sent to ******8821.
+                          Secure OTP sent to <span className="font-bold text-black">{targetEmail}</span>.
                       </p>
 
                       <div>
@@ -317,7 +306,7 @@ const Login = () => {
                              onChange={(e) => setOtp(e.target.value)}
                              autoFocus
                           />
-                          <p className="text-xs text-gray-400 mt-2">Test Code: <span className="font-bold text-black">123456</span></p>
+                          <p className="text-xs text-gray-400 mt-2">Please check your Spring Boot Console for the code.</p>
                       </div>
 
                       <button className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-md shadow-lg flex items-center justify-center gap-2">
@@ -326,7 +315,7 @@ const Login = () => {
                       
                       <button 
                         type="button"
-                        onClick={() => { setStep(1); setError(''); }} 
+                        onClick={() => { setStep(1); setError(''); setOtp(''); }} 
                         className="text-xs text-gray-500 underline hover:text-black"
                       >
                           Cancel
