@@ -34,16 +34,16 @@ const Login = () => {
 
       console.log("CREDENTIALS VALID:", response.data);
 
-      const user = response.data;
-      const userRole = (user.role || '').toUpperCase();
+      // --- NEW JWT LOGIC ---
+      // The backend now returns { token, username, role }
+      const authenticatedData = response.data; 
+      const userRole = (authenticatedData.role || '').toUpperCase();
 
       // 2. SECURITY CHECK: Tab Mismatch?
-      // Block Employees trying to use Admin Tab
       if (loginType === 'authority' && (userRole === 'EMPLOYEE' || userRole === 'GOVT_EMPLOYEE')) {
           setError('Access Denied: Employees must use the "Employee" tab.');
           return;
       }
-      // Block Admins trying to use Employee Tab
       if (loginType === 'employee' && userRole !== 'EMPLOYEE' && userRole !== 'GOVT_EMPLOYEE') {
           setError('Security Alert: Please use the "Official / Admin" tab.');
           return;
@@ -52,16 +52,22 @@ const Login = () => {
       // 3. DECIDE NEXT STEP
       if (loginType === 'authority') {
           // Authority -> Go to Step 2 (OTP)
-          setTempUser(user);
+          // We temporarily hold the token and user info until OTP is verified
+          setTempUser(authenticatedData);
           setStep(2);
       } else {
           // Employee -> Login Immediately
-          completeLogin(user);
+          completeLogin(authenticatedData);
       }
 
     } catch (err) {
       console.error("Login Error:", err);
-      setError('Invalid Credentials or Server Error');
+      // Look for custom error messages from backend (like "Account pending admin approval")
+      if (err.response && err.response.data) {
+          setError(typeof err.response.data === 'string' ? err.response.data : 'Invalid Credentials');
+      } else {
+          setError('Invalid Credentials or Server Error');
+      }
     }
   };
 
@@ -77,13 +83,18 @@ const Login = () => {
   };
 
   // --- FINAL: SAVE & REDIRECT ---
-  const completeLogin = (user) => {
-      localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('userRole', user.role); // Important for Route Protection
+  const completeLogin = (userData) => {
+      
+      // --- NEW: SAVE THE JWT TOKEN ---
+      localStorage.setItem('token', userData.token); 
+      
+      // Save other user details
+      localStorage.setItem('user', JSON.stringify({ username: userData.username, role: userData.role }));
+      localStorage.setItem('userRole', userData.role);
       localStorage.setItem('isLoggedIn', 'true');
 
       // Safe Redirect Logic based on BACKEND ROLE
-      const userRole = (user.role || '').toUpperCase();
+      const userRole = (userData.role || '').toUpperCase();
 
       if (userRole === 'DEPT_HEAD' || userRole === 'HEAD') {
           navigate('/admin');
@@ -94,7 +105,7 @@ const Login = () => {
       } else if (userRole === 'AUDITOR') {
           navigate('/auditor');
       } else if (userRole === 'EMPLOYEE' || userRole === 'GOVT_EMPLOYEE') {
-          navigate('/employee'); // Redirect Rahul here
+          navigate('/employee'); 
       } else {
           // Fallback
           navigate('/');
