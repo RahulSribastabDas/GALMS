@@ -1,11 +1,17 @@
 package com.gov.asset_management.model;
 
 import jakarta.persistence.*;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties; // Import this
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.time.LocalDateTime;
 
 @Entity
+@Table(name = "service_requests")
 public class ServiceRequest {
+
+    // Define the ENUM right inside the class
+    public enum RequestType {
+        REQUISITION, MAINTENANCE, RETURN
+    }
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -17,11 +23,19 @@ public class ServiceRequest {
     @JsonIgnoreProperties("password") // Security: Don't send password back to frontend
     private User employee;
 
+    // --- THE BRIDGE ---
+    // Catches the "employeeName" string from React, but doesn't save it as a DB column
+    @Transient
+    private String employeeName;
+
     @Enumerated(EnumType.STRING)
     private RequestType type;
 
     private String priority;
+
+    @Column(length = 1000)
     private String description;
+
     private String status = "SUBMITTED";
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -31,6 +45,9 @@ public class ServiceRequest {
 
     public User getEmployee() { return employee; }
     public void setEmployee(User employee) { this.employee = employee; }
+
+    public String getEmployeeName() { return employeeName; }
+    public void setEmployeeName(String employeeName) { this.employeeName = employeeName; }
 
     public RequestType getType() { return type; }
     public void setType(RequestType type) { this.type = type; }

@@ -1,5 +1,6 @@
 package com.gov.asset_management.controller;
 
+import com.gov.asset_management.model.RequestType; // <-- Added this import
 import com.gov.asset_management.model.ServiceRequest;
 import com.gov.asset_management.model.User;
 import com.gov.asset_management.repository.ServiceRequestRepository;
@@ -42,7 +43,7 @@ public class ServiceRequestController {
             if (dbUser == null) {
                 // THIS IS THE MOST COMMON CAUSE OF 500 ERRORS
                 System.out.println(">>> ERROR: User '" + username + "' NOT FOUND in Database!");
-                System.out.println(">>> HINT: Did you restart the server? If using H2, the user 'rahul' might be deleted.");
+                System.out.println(">>> HINT: Did you restart the server? If using H2, the user might be deleted.");
                 return ResponseEntity.status(404).body("User '" + username + "' not found. Please Register/Login again.");
             }
 
@@ -69,5 +70,30 @@ public class ServiceRequestController {
     @GetMapping("/my-tickets/{username}")
     public List<ServiceRequest> getMyTickets(@PathVariable String username) {
         return repo.findByEmployee_Username(username);
+    }
+
+    // --- NEW: FOR PROCUREMENT OFFICER ---
+    // Fetches ONLY "REQUISITION" tickets that are newly "SUBMITTED"
+    @GetMapping("/pending-requisitions")
+    public ResponseEntity<List<ServiceRequest>> getPendingRequisitions() {
+        List<ServiceRequest> pendingReqs = repo.findByStatusAndType(
+                "SUBMITTED",
+                RequestType.REQUISITION
+        );
+        return ResponseEntity.ok(pendingReqs);
+    }
+    // --- 5. UPDATE TICKET STATUS (e.g., Mark as CLOSED) ---
+    @PutMapping("/{id}/status")
+    public ResponseEntity<?> updateTicketStatus(@PathVariable Long id, @RequestParam String status) {
+        ServiceRequest request = repo.findById(id).orElse(null);
+
+        if (request == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        request.setStatus(status);
+        repo.save(request);
+
+        return ResponseEntity.ok("Ticket " + id + " successfully marked as " + status);
     }
 }
