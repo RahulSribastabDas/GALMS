@@ -9,30 +9,35 @@ import {
 const EmployeeDashboard = () => {
   // --- STATE MANAGEMENT ---
   const [myAssets, setMyAssets] = useState([]);
-  const [myTickets, setMyTickets] = useState([]); // State for Tickets
+  const [myTickets, setMyTickets] = useState([]); 
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false); // Toggle for "Raise Ticket" Popup
+  const [showModal, setShowModal] = useState(false); 
   
-  // Form State for the Ticket
   const [ticketForm, setTicketForm] = useState({
       type: 'MAINTENANCE',
       priority: 'Medium',
       description: ''
   });
   
-  // Get logged in user
+  // Get logged-in user and security token
   const user = JSON.parse(localStorage.getItem('user')) || { username: 'rahul', role: 'EMPLOYEE' };
+  const token = localStorage.getItem('token'); // <-- ADDED THIS
 
   // --- 1. FETCH DATA ON LOAD ---
   useEffect(() => {
-    fetchMyAssets();
-    fetchMyTickets();
-  }, []);
+    if (token) {
+        fetchMyAssets();
+        fetchMyTickets();
+    }
+  }, [token]);
 
-  // Fetch Assets (Existing Logic)
+  // Fetch Assets 
   const fetchMyAssets = async () => {
     try {
-      const response = await axios.get('http://localhost:8080/api/assets');
+      // ADDED SECURITY HEADER
+      const response = await axios.get('http://localhost:8080/api/assets', {
+          headers: { Authorization: `Bearer ${token}` }
+      });
       const myItems = response.data.filter(asset => 
         asset.assignedTo && asset.assignedTo.username === user.username
       );
@@ -44,11 +49,13 @@ const EmployeeDashboard = () => {
     }
   };
 
-  // Fetch Tickets (New Logic)
+  // Fetch Tickets 
   const fetchMyTickets = async () => {
       try {
-          // Assuming Controller has: @GetMapping("/my-tickets/{username}")
-          const response = await axios.get(`http://localhost:8080/api/requests/my-tickets/${user.username}`);
+          // ADDED SECURITY HEADER
+          const response = await axios.get(`http://localhost:8080/api/requests/my-tickets/${user.username}`, {
+              headers: { Authorization: `Bearer ${token}` }
+          });
           setMyTickets(response.data);
       } catch (error) {
           console.error("Error fetching tickets:", error);
@@ -61,7 +68,10 @@ const EmployeeDashboard = () => {
   const handleAccept = async (assetId) => {
       if(window.confirm("I certify that I have physically received this item in good working condition.")) {
           try {
-            await axios.post(`http://localhost:8080/api/assets/accept/${assetId}`);
+            // ADDED SECURITY HEADER
+            await axios.post(`http://localhost:8080/api/assets/accept/${assetId}`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
             alert("✅ Custody Accepted! The asset is now officially under your care.");
             setMyAssets(prev => prev.map(a => a.id === assetId ? {...a, assignmentPending: false} : a));
           } catch (err) {
@@ -74,28 +84,23 @@ const EmployeeDashboard = () => {
   const handleRaiseTicket = async (e) => {
       e.preventDefault();
       try {
-          // Matches your Java ServiceRequest Model
           const payload = {
-              employee: { username: user.username }, // Send user object or just ID depending on backend
               type: ticketForm.type,
               priority: ticketForm.priority,
               description: ticketForm.description,
-              status: 'SUBMITTED'
+              status: 'SUBMITTED',
+              employeeName: user.username 
           };
-
-          // If your Controller expects just username string, adjust payload accordingly. 
-          // Based on previous controller: 
-          // await axios.post('http://localhost:8080/api/requests/raise', { ...payload, employeeName: user.username });
           
-          await axios.post('http://localhost:8080/api/requests/raise', {
-             ...payload,
-             employeeName: user.username // Helper for Controller to find User
+          // ADDED SECURITY HEADER
+          await axios.post('http://localhost:8080/api/requests/raise', payload, {
+              headers: { Authorization: `Bearer ${token}` }
           });
 
           alert("✅ Ticket Raised Successfully!");
           setShowModal(false);
-          setTicketForm({ type: 'MAINTENANCE', priority: 'Medium', description: '' }); // Reset
-          fetchMyTickets(); // Refresh the table
+          setTicketForm({ type: 'MAINTENANCE', priority: 'Medium', description: '' }); 
+          fetchMyTickets(); 
       } catch (error) {
           alert("Failed to raise ticket. Ensure Backend is running.");
       }
@@ -105,7 +110,7 @@ const EmployeeDashboard = () => {
     <DashboardLayout role="EMPLOYEE">
       
       {/* --- 1. BREADCRUMB & WELCOME --- */}
-      <div className="flex justify-between items-end mb-6 border-b border-gray-200 pb-4">
+      <div className="flex justify-between items-end mb-6 border-b border-gray-200 pb-4 p-4">
          <div>
             <div className="flex items-center gap-1 text-[10px] text-gray-500 uppercase tracking-wide mb-1">
                <span>Home</span> <ChevronRight size={10}/> <span>Employee Self Service (ESS)</span>
@@ -121,9 +126,9 @@ const EmployeeDashboard = () => {
          </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4">
 
-        {/* --- LEFT COLUMN: ASSETS & REQUESTS (Wider) --- */}
+        {/* --- LEFT COLUMN: ASSETS & REQUESTS --- */}
         <div className="lg:col-span-2 space-y-6">
            
            {/* SECTION A: MY ASSIGNED ASSETS */}
@@ -182,7 +187,7 @@ const EmployeeDashboard = () => {
               </div>
            </div>
 
-           {/* SECTION B: RECENT TICKETS (Now Dynamic) */}
+           {/* SECTION B: RECENT TICKETS */}
            <div className="bg-white border border-gray-200 shadow-sm rounded-sm">
               <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex justify-between items-center">
                  <h2 className="font-bold text-[#0b1e3c] flex items-center gap-2"><Clock size={18}/> Recent Service Requests</h2>
@@ -229,10 +234,8 @@ const EmployeeDashboard = () => {
 
         </div>
 
-        {/* --- RIGHT COLUMN: NOTICES & PROFILE (Narrow) --- */}
+        {/* --- RIGHT COLUMN: NOTICES & PROFILE --- */}
         <div className="space-y-6">
-
-           {/* CARD 1: ID CARD STYLE PROFILE */}
            <div className="bg-gradient-to-b from-[#0b1e3c] to-[#1b3a6b] text-white p-6 rounded shadow-md text-center">
               <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto text-2xl font-bold border-2 border-white/50 mb-3">
                  {user.username.charAt(0).toUpperCase()}
@@ -246,7 +249,6 @@ const EmployeeDashboard = () => {
               </div>
            </div>
 
-           {/* CARD 2: CIRCULARS */}
            <div className="bg-white border border-gray-200 shadow-sm rounded-sm p-4">
               <h3 className="font-bold text-gray-700 text-sm mb-3 flex items-center gap-2">
                  <FileText size={16} className="text-orange-500"/> Office Circulars
@@ -264,13 +266,11 @@ const EmployeeDashboard = () => {
               </ul>
            </div>
 
-           {/* CARD 3: HELP */}
            <div className="bg-blue-50 border border-blue-100 p-4 rounded text-center">
               <AlertCircle className="text-blue-500 mx-auto mb-2" size={24}/>
               <h4 className="font-bold text-sm text-blue-900">Need IT Support?</h4>
               <p className="font-bold text-lg text-[#0b1e3c]">Ext: 4402</p>
            </div>
-
         </div>
 
       </div>
