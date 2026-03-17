@@ -81,6 +81,7 @@ const EmployeeDashboard = () => {
   };
 
   // Handle Ticket Submission
+  // Handle Ticket Submission
   const handleRaiseTicket = async (e) => {
       e.preventDefault();
       try {
@@ -89,10 +90,14 @@ const EmployeeDashboard = () => {
               priority: ticketForm.priority,
               description: ticketForm.description,
               status: 'SUBMITTED',
-              employeeName: user.username 
+              
+              // --- THE FIX IS HERE ---
+              // We send a nested object so Spring Boot maps it to the User entity!
+              employee: { 
+                  username: user.username 
+              }
           };
           
-          // ADDED SECURITY HEADER
           await axios.post('http://localhost:8080/api/requests/raise', payload, {
               headers: { Authorization: `Bearer ${token}` }
           });
@@ -102,10 +107,10 @@ const EmployeeDashboard = () => {
           setTicketForm({ type: 'MAINTENANCE', priority: 'Medium', description: '' }); 
           fetchMyTickets(); 
       } catch (error) {
-          alert("Failed to raise ticket. Ensure Backend is running.");
+          console.error("Full Error:", error);
+          alert("Failed to raise ticket. Check console for details.");
       }
   };
-
   return (
     <DashboardLayout role="EMPLOYEE">
       

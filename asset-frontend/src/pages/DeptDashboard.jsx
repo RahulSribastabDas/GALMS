@@ -3,11 +3,12 @@ import axios from 'axios';
 import DashboardLayout from '../components/DashboardLayout'; 
 import { 
   Building2, Users, MonitorSmartphone, CheckCircle, 
-  Send, UserPlus, AlertCircle 
+  Send, UserPlus, AlertCircle, Wrench, CheckCircle2, XCircle
 } from 'lucide-react';
 
 const DeptDashboard = () => {
   const [assets, setAssets] = useState([]);
+  const [tickets, setTickets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Modal State
@@ -17,30 +18,41 @@ const DeptDashboard = () => {
 
   const user = JSON.parse(localStorage.getItem('user'));
   const token = localStorage.getItem('token');
-  const userDept = user?.department || 'SOFTWARE FORCE'; // Fallback for testing
+  const userDept = user?.department || 'SOFTWARE FORCE'; 
 
-  // --- 1. FETCH DEPARTMENT ASSETS ---
+  // --- 1. FETCH DATA (ASSETS & TICKETS) ---
   useEffect(() => {
-    const fetchDeptAssets = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const response = await axios.get('http://localhost:8080/api/assets', {
+        // Fetch Assets
+        const assetRes = await axios.get('http://localhost:8080/api/assets', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const myDeptAssets = assetRes.data.filter(
+            asset => asset.department === userDept && asset.status === 'AVAILABLE'
+        );
+        setAssets(myDeptAssets);
+
+        // Fetch Pending Tickets (Assuming this endpoint exists in your controller!)
+        const ticketRes = await axios.get('http://localhost:8080/api/requests/pending', {
           headers: { Authorization: `Bearer ${token}` }
         });
         
-        // Filter: Only show assets for THIS department that are sitting in the warehouse (AVAILABLE)
-        const myDeptAssets = response.data.filter(
-            asset => asset.department === userDept && asset.status === 'AVAILABLE'
-        );
-        
-        setAssets(myDeptAssets);
+        // Filter out Requisitions (those go to the PO). Keep Maintenance & Returns.
+       // Temporarily removed the strict department check so Priya can see all maintenance tickets
+const myDeptTickets = ticketRes.data.filter(
+    t => t.type !== 'REQUISITION'
+);
+        setTickets(myDeptTickets);
+
         setIsLoading(false);
       } catch (error) {
-        console.error("Error fetching department assets:", error);
+        console.error("Error fetching dashboard data:", error);
         setIsLoading(false);
       }
     };
 
-    if (token) fetchDeptAssets();
+    if (token) fetchDashboardData();
   }, [token, userDept]);
 
   // --- 2. ASSIGN ASSET TO EMPLOYEE ---
@@ -49,17 +61,12 @@ const DeptDashboard = () => {
     if (!selectedAsset || !targetUsername) return;
 
     try {
-      // Calls the exact PUT mapping you wrote in AssetController.java
       await axios.put(`http://localhost:8080/api/assets/${selectedAsset.id}/assign/${targetUsername}`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      alert(`✅ Asset successfully allocated to ${targetUsername}. Waiting for their acceptance.`);
-      
-      // Remove the assigned asset from the "Available" list
+      alert(`✅ Asset successfully allocated to ${targetUsername}.`);
       setAssets(assets.filter(a => a.id !== selectedAsset.id));
-      
-      // Close and reset modal
       setShowAssignModal(false);
       setSelectedAsset(null);
       setTargetUsername('');
@@ -70,6 +77,22 @@ const DeptDashboard = () => {
     }
   };
 
+  // --- 3. HANDLE TICKET ACTION (Approve/Reject) ---
+  const handleTicketAction = async (ticketId, newStatus) => {
+      try {
+          await axios.put(`http://localhost:8080/api/requests/${ticketId}/status?status=${newStatus}`, {}, {
+              headers: { Authorization: `Bearer ${token}` }
+          });
+          
+          // Remove it from the inbox
+          setTickets(tickets.filter(t => t.id !== ticketId));
+          alert(`Ticket successfully marked as ${newStatus}.`);
+      } catch (error) {
+          console.error("Error updating ticket:", error);
+          alert("Failed to update ticket. Check if backend endpoint exists.");
+      }
+  };
+
   const openModal = (asset) => {
       setSelectedAsset(asset);
       setShowAssignModal(true);
@@ -77,10 +100,10 @@ const DeptDashboard = () => {
 
   return (
     <DashboardLayout role="DEPT_HEAD">
-      <div className="p-2">
+      <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
         
         {/* --- DEPT HEAD HEADER --- */}
-        <div className="bg-[#1e3a8a] p-6 rounded-2xl shadow-lg mb-8 text-white relative overflow-hidden">
+        <div className="bg-[#1e3a8a] p-6 rounded-2xl shadow-lg text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 p-16 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
           
           <div className="relative z-10 flex justify-between items-end">
@@ -89,67 +112,136 @@ const DeptDashboard = () => {
                   <Building2 size={20} className="text-blue-200" />
                   <span className="text-xs font-bold uppercase tracking-widest text-blue-200">Department Administration</span>
                </div>
-               <h1 className="text-3xl font-bold tracking-tight">{userDept} Allocations</h1>
+               <h1 className="text-2xl md:text-3xl font-bold tracking-tight">{userDept} Overview</h1>
                <p className="text-blue-100 mt-1 text-sm italic">Logged in as: Joint Secretary {user?.username}</p>
             </div>
-            <div className="flex gap-4">
+            <div className="hidden md:flex gap-4">
                 <div className="bg-white/10 border border-white/20 p-3 rounded-lg text-center backdrop-blur-sm">
                     <p className="text-2xl font-bold">{assets.length}</p>
                     <p className="text-[10px] uppercase tracking-wider text-blue-200">Unassigned Assets</p>
+                </div>
+                <div className="bg-orange-500/20 border border-orange-500/40 p-3 rounded-lg text-center backdrop-blur-sm">
+                    <p className="text-2xl font-bold text-orange-200">{tickets.length}</p>
+                    <p className="text-[10px] uppercase tracking-wider text-orange-200">Pending Tickets</p>
                 </div>
             </div>
           </div>
         </div>
 
-        {/* --- AVAILABLE INVENTORY TABLE --- */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-             <div>
-               <h3 className="font-bold text-gray-800 flex items-center gap-2"><MonitorSmartphone size={18}/> Available Department Stock</h3>
-               <p className="text-xs text-gray-500">Assets ready to be issued to employees</p>
-             </div>
-          </div>
+        {/* --- TWO COLUMN LAYOUT --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-          <table className="w-full text-sm text-left">
-             <thead className="bg-gray-100 text-gray-600">
-               <tr>
-                 <th className="px-6 py-4 font-semibold">Asset ID</th>
-                 <th className="px-6 py-4 font-semibold">Name & Model</th>
-                 <th className="px-6 py-4 font-semibold">Category</th>
-                 <th className="px-6 py-4 font-semibold">Purchase Value</th>
-                 <th className="px-6 py-4 text-right font-semibold">Action</th>
-               </tr>
-             </thead>
-             <tbody className="divide-y divide-gray-100">
-               {isLoading ? (
-                   <tr><td colSpan="5" className="px-6 py-8 text-center text-gray-500 font-medium">Loading inventory...</td></tr>
-               ) : assets.length === 0 ? (
-                 <tr>
-                   <td colSpan="5" className="px-6 py-8 text-center text-gray-500 font-medium flex flex-col items-center justify-center">
-                     <AlertCircle size={32} className="text-gray-300 mb-2"/>
-                     No unassigned assets currently in the {userDept} warehouse.
-                   </td>
-                 </tr>
-               ) : (
-                 assets.map((asset) => (
-                   <tr key={asset.id} className="hover:bg-blue-50/50 transition-colors">
-                     <td className="px-6 py-4 font-mono font-bold text-blue-800">{asset.assetId || `AST-${asset.id}`}</td>
-                     <td className="px-6 py-4 font-bold text-gray-800">{asset.assetName}</td>
-                     <td className="px-6 py-4 text-gray-500">{asset.category}</td>
-                     <td className="px-6 py-4 font-mono text-gray-800">₹ {asset.cost?.toLocaleString()}</td>
-                     <td className="px-6 py-4 text-right">
-                        <button 
-                            onClick={() => openModal(asset)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-xs font-bold shadow-sm transition-colors flex items-center gap-2 ml-auto"
-                        >
-                            <UserPlus size={14}/> Allocate to Staff
-                        </button>
-                     </td>
-                   </tr>
-                 ))
-               )}
-             </tbody>
-          </table>
+            {/* LEFT COLUMN: AVAILABLE INVENTORY */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[500px]">
+              <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                 <div>
+                   <h3 className="font-bold text-gray-800 flex items-center gap-2"><MonitorSmartphone size={18}/> Available Stock</h3>
+                   <p className="text-xs text-gray-500">Assets ready to issue</p>
+                 </div>
+              </div>
+
+              <div className="overflow-y-auto flex-grow">
+                 <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-100 text-gray-600 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold text-xs">Asset details</th>
+                        <th className="px-4 py-3 text-right font-semibold text-xs">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {isLoading ? (
+                          <tr><td colSpan="2" className="p-6 text-center text-gray-500 font-medium">Loading inventory...</td></tr>
+                      ) : assets.length === 0 ? (
+                        <tr>
+                          <td colSpan="2" className="p-10 text-center text-gray-500 font-medium">
+                            <AlertCircle size={32} className="mx-auto text-gray-300 mb-2"/>
+                            No unassigned assets currently in warehouse.
+                          </td>
+                        </tr>
+                      ) : (
+                        assets.map((asset) => (
+                          <tr key={asset.id} className="hover:bg-blue-50/50 transition-colors">
+                            <td className="px-4 py-4">
+                               <div className="font-bold text-gray-800">{asset.assetName}</div>
+                               <div className="text-[10px] font-mono text-blue-800 mt-0.5">{asset.assetId} • {asset.category}</div>
+                            </td>
+                            <td className="px-4 py-4 text-right align-middle">
+                               <button 
+                                   onClick={() => openModal(asset)}
+                                   className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-bold shadow-sm transition-colors flex items-center gap-1 ml-auto"
+                               >
+                                   <UserPlus size={14}/> Assign
+                               </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                 </table>
+              </div>
+            </div>
+
+            {/* RIGHT COLUMN: STAFF SERVICE REQUESTS */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[500px]">
+              <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                 <div>
+                   <h3 className="font-bold text-gray-800 flex items-center gap-2"><Wrench size={18} className="text-orange-500"/> Staff Service Requests</h3>
+                   <p className="text-xs text-gray-500">Maintenance & Returns</p>
+                 </div>
+              </div>
+
+              <div className="overflow-y-auto flex-grow">
+                 <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-100 text-gray-600 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold text-xs">Ticket Info</th>
+                        <th className="px-4 py-3 text-right font-semibold text-xs">Resolution</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {isLoading ? (
+                          <tr><td colSpan="2" className="p-6 text-center text-gray-500 font-medium">Loading tickets...</td></tr>
+                      ) : tickets.length === 0 ? (
+                        <tr>
+                          <td colSpan="2" className="p-10 text-center text-gray-500 font-medium">
+                            <CheckCircle2 size={32} className="mx-auto text-gray-300 mb-2"/>
+                            No pending service requests.
+                          </td>
+                        </tr>
+                      ) : (
+                        tickets.map((ticket) => (
+                          <tr key={ticket.id} className="hover:bg-orange-50/30 transition-colors">
+                            <td className="px-4 py-4">
+                               <div className="flex items-center gap-2 mb-1">
+                                   <span className="font-bold text-gray-800 text-sm">{ticket.employee?.username}</span>
+                                   <span className="bg-gray-200 text-gray-700 text-[9px] px-1.5 py-0.5 rounded font-bold uppercase">{ticket.type}</span>
+                               </div>
+                               <p className="text-xs text-gray-600 truncate max-w-[200px] italic">"{ticket.description}"</p>
+                            </td>
+                            <td className="px-4 py-4 text-right align-middle">
+                               <div className="flex justify-end gap-2">
+                                   <button 
+                                      onClick={() => handleTicketAction(ticket.id, 'APPROVED')}
+                                      className="text-green-600 hover:bg-green-50 p-1.5 rounded border border-green-200 transition-colors" title="Approve & Close"
+                                   >
+                                      <CheckCircle2 size={16}/>
+                                   </button>
+                                   <button 
+                                      onClick={() => handleTicketAction(ticket.id, 'REJECTED')}
+                                      className="text-red-600 hover:bg-red-50 p-1.5 rounded border border-red-200 transition-colors" title="Reject"
+                                   >
+                                      <XCircle size={16}/>
+                                   </button>
+                               </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                 </table>
+              </div>
+            </div>
+
         </div>
 
         {/* --- MODAL: ASSIGN ASSET --- */}
@@ -181,9 +273,6 @@ const DeptDashboard = () => {
                         placeholder="e.g. rahul" 
                       />
                   </div>
-                  <p className="text-[10px] text-gray-500 mt-2">
-                      The asset will be marked as "Assignment Pending" until the employee logs in and accepts custody.
-                  </p>
                 </div>
 
                 <div className="pt-2 flex gap-3">
