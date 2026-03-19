@@ -92,7 +92,7 @@ const PODashboard = () => {
       console.error("Error adding asset:", error);
       alert("Failed to process. Make sure the Asset ID is unique and backend is running!");
     }
-  };n
+  };
 
   // --- 3. HANDLE FULFILL REQUISITION ---
   // --- 3. HANDLE FULFILL REQUISITION ---
