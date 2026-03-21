@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios'; 
-import { Shield, User, Lock, Globe, Phone, AlertCircle, KeyRound, CheckCircle } from 'lucide-react';
+import { Shield, User, Lock, Globe, Phone, AlertCircle, KeyRound, CheckCircle, Bell, Info } from 'lucide-react';
 
 // --- TRANSLATION DICTIONARY ---
 const translations = {
@@ -19,7 +19,6 @@ const translations = {
     directory: "Department Directory",
     support: "Support",
     announcements: "Latest Announcements",
-    auditNotice: "Audit for FY 2025-26 initiated. All Departments to update stock registers.",
     signIn: "Sign In",
     accessPortal: "Access the Secure Asset Portal",
     officialTab: "Official / Admin",
@@ -47,7 +46,6 @@ const translations = {
     directory: "विभाग निर्देशिका",
     support: "सहायता",
     announcements: "नवीनतम घोषणाएं",
-    auditNotice: "वित्तीय वर्ष 2025-26 के लिए ऑडिट शुरू। सभी विभाग स्टॉक रजिस्टर अपडेट करें।",
     signIn: "साइन इन करें",
     accessPortal: "सुरक्षित संपत्ति पोर्टल तक पहुंचें",
     officialTab: "अधिकारी / व्यवस्थापक",
@@ -68,23 +66,42 @@ const Login = () => {
   
   // --- LANGUAGE STATE ---
   const [lang, setLang] = useState('en');
-  const t = translations[lang]; // Pulls the correct language words!
+  const t = translations[lang]; 
 
-  // UI Toggles
+  // --- UI TOGGLES ---
   const [loginType, setLoginType] = useState('authority'); 
   const [step, setStep] = useState(1); 
+  const [showNotifications, setShowNotifications] = useState(false); 
   
-  // DATA STATE
+  // --- DATA STATE ---
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('DEPT_HEAD'); 
   const [error, setError] = useState(''); 
   
-  // OTP STATE
+  // --- OTP STATE ---
   const [otp, setOtp] = useState('');
   const [targetEmail, setTargetEmail] = useState(''); 
 
-  // --- STEP 1: CHECK CREDENTIALS ---
+  // --- REAL DATABASE ANNOUNCEMENTS STATE ---
+  const [liveAnnouncements, setLiveAnnouncements] = useState([]);
+
+  // --- FETCH ANNOUNCEMENTS FROM POSTGRESQL ON LOAD ---
+  useEffect(() => {
+      const fetchAnnouncements = async () => {
+          try {
+              const response = await axios.get('http://localhost:8080/api/announcements/public');
+              setLiveAnnouncements(response.data);
+          } catch (error) {
+              console.error("Could not fetch announcements:", error);
+              setLiveAnnouncements([
+                  { id: 0, type: "INFO", title: "System Connection", date: new Date().toLocaleDateString(), text: "Unable to connect to live announcements database. Please check server." }
+              ]);
+          }
+      };
+      fetchAnnouncements();
+  }, []);
+
   const handleCredentialsCheck = async (e) => {
     e.preventDefault();
     setError('');
@@ -110,7 +127,6 @@ const Login = () => {
     }
   };
 
-  // --- STEP 2: VERIFY REAL OTP ---
   const handleOtpVerify = async (e) => {
       e.preventDefault();
       setError('');
@@ -125,10 +141,13 @@ const Login = () => {
       }
   };
 
-  // --- FINAL: SAVE & REDIRECT ---
   const completeLogin = (userData) => {
       localStorage.setItem('token', userData.token); 
-      localStorage.setItem('user', JSON.stringify({ username: userData.username, role: userData.role }));
+      localStorage.setItem('user', JSON.stringify({ 
+          username: userData.username, 
+          role: userData.role,
+          firstLogin: userData.firstLogin 
+      }));
       localStorage.setItem('userRole', userData.role);
       localStorage.setItem('isLoggedIn', 'true');
 
@@ -145,6 +164,11 @@ const Login = () => {
       else navigate('/employee'); 
   };
 
+  // --- UPGRADED: REAL ROUTER NAVIGATION ---
+  const handleNavClick = (path) => {
+      navigate(path);
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 font-sans">
       
@@ -158,7 +182,6 @@ const Login = () => {
             <span className="bg-white text-black px-1 font-bold text-[9px] cursor-pointer">A+</span>
             <span className="bg-white text-black px-1 font-bold text-[9px] cursor-pointer">A-</span>
             
-            {/* --- LANGUAGE DROPDOWN --- */}
             <div className="flex items-center gap-1 hover:text-yellow-400">
               <Globe size={10}/>
               <select 
@@ -194,36 +217,80 @@ const Login = () => {
          </div>
       </div>
 
-      {/* --- 3. NAVIGATION BAR --- */}
-      <div className="bg-[#0b1e3c] text-white text-sm font-medium shadow-md border-t-4 border-orange-500">
-         <div className="container mx-auto px-4 md:px-16 py-3 flex flex-wrap gap-6 md:gap-8">
-            <a href="#" className="hover:text-yellow-400 flex items-center gap-1">{t.home}</a>
-            <a href="#" className="hover:text-yellow-400">{t.about}</a>
-            <a href="#" className="hover:text-yellow-400">{t.notifications} <span className="bg-red-500 text-[9px] px-1 rounded animate-pulse">{t.new}</span></a>
-            <a href="#" className="hover:text-yellow-400">{t.userManual}</a>
-            <a href="#" className="hover:text-yellow-400">{t.directory}</a>
-            <a href="#" className="hover:text-yellow-400 ml-auto flex items-center gap-1"><Phone size={14}/> {t.support}</a>
+      {/* --- 3. NAVIGATION BAR (WITH REAL ROUTING) --- */}
+      <div className="bg-[#0b1e3c] text-white text-sm font-medium shadow-md border-t-4 border-orange-500 relative z-50">
+         <div className="container mx-auto px-4 md:px-16 py-3 flex flex-wrap items-center gap-6 md:gap-8">
+            <button onClick={() => handleNavClick('/login')} className="hover:text-yellow-400 transition-colors">{t.home}</button>
+            <button onClick={() => handleNavClick('/about')} className="hover:text-yellow-400 transition-colors">{t.about}</button>
+            
+            <div className="relative">
+                <button 
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className={`flex items-center gap-1.5 transition-colors ${showNotifications ? 'text-yellow-400' : 'hover:text-yellow-400'}`}
+                >
+                    <Bell size={16} /> {t.notifications} 
+                    <span className="bg-red-500 text-[9px] px-1.5 py-0.5 rounded-full animate-pulse shadow-sm font-bold">
+                        {liveAnnouncements.length}
+                    </span>
+                </button>
+
+                {showNotifications && (
+                    <div className="absolute top-full left-0 mt-4 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                            <h4 className="text-gray-800 font-bold text-sm">System Updates</h4>
+                            <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-gray-800 text-lg leading-none font-bold">✕</button>
+                        </div>
+                        <div className="max-h-72 overflow-y-auto">
+                            {liveAnnouncements.map(notif => (
+                                <div key={notif.id} className="p-4 border-b border-gray-50 hover:bg-blue-50/50 transition-colors cursor-pointer group text-left">
+                                    <div className="flex justify-between items-start mb-1">
+                                        <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${notif.type === 'ALERT' ? 'bg-red-100 text-red-700' : notif.type === 'INFO' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                            {notif.type}
+                                        </span>
+                                        <span className="text-[10px] text-gray-400 font-medium">{notif.date}</span>
+                                    </div>
+                                    <h5 className="text-xs font-bold text-gray-800 group-hover:text-[#1e3a8a] mb-1">{notif.title}</h5>
+                                    <p className="text-[11px] text-gray-600 line-clamp-2">{notif.text}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <button onClick={() => handleNavClick('/manual')} className="hover:text-yellow-400 transition-colors">{t.userManual}</button>
+            <button onClick={() => handleNavClick('/directory')} className="hover:text-yellow-400 transition-colors">{t.directory}</button>
+            <button className="hover:text-yellow-400 transition-colors ml-auto flex items-center gap-1">
+                <Phone size={14}/> {t.support}
+            </button>
          </div>
       </div>
 
       {/* --- 4. MAIN CONTENT --- */}
-      <div className="flex-grow bg-[#f4f7fa] flex items-center justify-center p-6">
+      <div className="flex-grow bg-[#f4f7fa] flex items-center justify-center p-6 relative z-10">
         <div className="flex flex-col md:flex-row bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden max-w-5xl w-full">
             
-            {/* LEFT SIDE: NOTICE BOARD */}
+            {/* LEFT SIDE: DYNAMIC NOTICE BOARD */}
             <div className="w-full md:w-5/12 bg-blue-50 border-r border-gray-200 flex flex-col relative">
                <div className="bg-[#1b3a6b] text-white p-4 font-bold flex items-center gap-2">
-                  <AlertCircle size={18}/> {t.announcements}
+                  <Info size={18}/> {t.announcements}
                </div>
-               <div className="p-6 space-y-4 overflow-y-auto h-full max-h-[400px]">
-                  <div className="bg-white p-3 rounded border-l-4 border-red-500 shadow-sm">
-                     <p className="text-xs text-red-600 font-bold mb-1">27 Jan 2026</p>
-                     <p className="text-sm text-gray-700">{t.auditNotice}</p>
-                  </div>
+               
+               <div className="p-0 overflow-y-auto h-full max-h-[400px]">
+                  {liveAnnouncements.map((item, index) => (
+                      <div key={item.id} className={`p-5 bg-white border-b border-gray-100 hover:bg-gray-50 transition-colors ${index === 0 ? 'border-l-4 border-l-red-500' : index === 1 ? 'border-l-4 border-l-blue-500' : 'border-l-4 border-l-green-500'}`}>
+                         <p className={`text-xs font-bold mb-1 ${index === 0 ? 'text-red-600' : index === 1 ? 'text-blue-600' : 'text-green-600'}`}>
+                            {item.date}
+                         </p>
+                         <h4 className="text-sm font-bold text-gray-800 mb-1">{item.title}</h4>
+                         <p className="text-xs text-gray-600 leading-relaxed">{item.text}</p>
+                      </div>
+                  ))}
                </div>
+
                <div className="mt-auto bg-[#eef2f8] p-4 text-center border-t border-gray-200">
                   <p className="text-xs font-bold text-gray-500">{t.helpdesk}</p>
-                  <p className="text-lg font-bold text-[#0b1e3c]">1800-111-555</p>
+                  <p className="text-lg font-bold text-[#0b1e3c] tracking-wider">1800-111-555</p>
                </div>
             </div>
 

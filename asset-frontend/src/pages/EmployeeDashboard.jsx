@@ -3,38 +3,44 @@ import DashboardLayout from '../components/DashboardLayout';
 import axios from 'axios';
 import { 
   Laptop, AlertCircle, CheckCircle, Clock, FileText, 
-  ChevronRight, Download, Plus, Smartphone, X 
+  ChevronRight, Download, Plus, Smartphone, X,
+  ShieldCheck, Key, Lock // <-- NEW SECURITY ICONS ADDED
 } from 'lucide-react';
 
 const EmployeeDashboard = () => {
-  // --- STATE MANAGEMENT ---
+  // --- 1. CORE USER STATE ---
+  // Converted to state so we can update it after password reset
+  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || { username: 'rahul', role: 'EMPLOYEE' });
+  const token = localStorage.getItem('token'); 
+
+  // --- 2. SECURITY LOCK STATE ---
+  const [needsPasswordChange, setNeedsPasswordChange] = useState(user?.firstLogin === true);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+
+  // --- 3. DASHBOARD DATA STATE ---
   const [myAssets, setMyAssets] = useState([]);
   const [myTickets, setMyTickets] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false); 
-  
   const [ticketForm, setTicketForm] = useState({
       type: 'MAINTENANCE',
       priority: 'Medium',
       description: ''
   });
   
-  // Get logged-in user and security token
-  const user = JSON.parse(localStorage.getItem('user')) || { username: 'rahul', role: 'EMPLOYEE' };
-  const token = localStorage.getItem('token'); // <-- ADDED THIS
-
-  // --- 1. FETCH DATA ON LOAD ---
+  // --- FETCH DATA ON LOAD ---
   useEffect(() => {
-    if (token) {
+    // Only fetch data if they don't need a password change!
+    if (token && !needsPasswordChange) {
         fetchMyAssets();
         fetchMyTickets();
     }
-  }, [token]);
+  }, [token, needsPasswordChange]);
 
-  // Fetch Assets 
   const fetchMyAssets = async () => {
     try {
-      // ADDED SECURITY HEADER
       const response = await axios.get('http://localhost:8080/api/assets', {
           headers: { Authorization: `Bearer ${token}` }
       });
@@ -49,10 +55,8 @@ const EmployeeDashboard = () => {
     }
   };
 
-  // Fetch Tickets 
   const fetchMyTickets = async () => {
       try {
-          // ADDED SECURITY HEADER
           const response = await axios.get(`http://localhost:8080/api/requests/my-tickets/${user.username}`, {
               headers: { Authorization: `Bearer ${token}` }
           });
@@ -62,13 +66,43 @@ const EmployeeDashboard = () => {
       }
   };
 
-  // --- 2. ACTIONS ---
-  
-  // Handle Asset Acceptance
+  // --- ACTIONS ---
+
+  // A: Handle Password Reset
+  const handlePasswordReset = async (e) => {
+      e.preventDefault();
+      setError('');
+
+      if (newPassword !== confirmPassword) return setError("Passwords do not match!");
+      if (newPassword.length < 6) return setError("Password must be at least 6 characters.");
+
+      try {
+          await axios.post('http://localhost:8080/api/auth/change-password', {
+              username: user.username,
+              newPassword: newPassword
+          }, {
+              headers: { Authorization: `Bearer ${token}` }
+          });
+
+          alert("✅ Password secured successfully! Welcome to the portal.");
+          
+          // Update local storage so they don't get locked out on refresh
+          const updatedUser = { ...user, firstLogin: false };
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          setUser(updatedUser);
+          
+          // Unlock the dashboard!
+          setNeedsPasswordChange(false); 
+      } catch (error) {
+          console.error("Password reset failed:", error);
+          setError("Failed to update password. Please try again.");
+      }
+  };
+
+  // B: Handle Asset Acceptance
   const handleAccept = async (assetId) => {
       if(window.confirm("I certify that I have physically received this item in good working condition.")) {
           try {
-            // ADDED SECURITY HEADER
             await axios.post(`http://localhost:8080/api/assets/accept/${assetId}`, {}, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -80,8 +114,7 @@ const EmployeeDashboard = () => {
       }
   };
 
-  // Handle Ticket Submission
-  // Handle Ticket Submission
+  // C: Handle Ticket Submission
   const handleRaiseTicket = async (e) => {
       e.preventDefault();
       try {
@@ -90,12 +123,7 @@ const EmployeeDashboard = () => {
               priority: ticketForm.priority,
               description: ticketForm.description,
               status: 'SUBMITTED',
-              
-              // --- THE FIX IS HERE ---
-              // We send a nested object so Spring Boot maps it to the User entity!
-              employee: { 
-                  username: user.username 
-              }
+              employee: { username: user.username }
           };
           
           await axios.post('http://localhost:8080/api/requests/raise', payload, {
@@ -111,10 +139,76 @@ const EmployeeDashboard = () => {
           alert("Failed to raise ticket. Check console for details.");
       }
   };
+
+  // ==========================================
+  // UI 1: THE HIGH-SECURITY LOCK SCREEN
+  // ==========================================
+  if (needsPasswordChange) {
+      return (
+          <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 z-[100] relative">
+             <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 opacity-20">
+                 <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-blue-500 rounded-full blur-3xl"></div>
+                 <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-purple-500 rounded-full blur-3xl"></div>
+             </div>
+
+             <div className="bg-white max-w-md w-full p-8 rounded-2xl shadow-2xl z-10 animate-in fade-in zoom-in duration-500">
+                 <div className="flex justify-center mb-6">
+                     <div className="bg-blue-50 p-4 rounded-full text-[#1e3a8a] ring-8 ring-blue-50/50">
+                         <ShieldCheck size={40} />
+                     </div>
+                 </div>
+                 <h2 className="text-2xl font-extrabold text-center text-gray-900 mb-2">Secure Your Account</h2>
+                 <p className="text-sm text-center text-gray-500 mb-6 px-4">
+                     Welcome, <span className="font-bold text-[#1e3a8a]">{user?.username}</span>! As per government security protocols, you must replace your temporary credentials before accessing the GALMS portal.
+                 </p>
+
+                 {error && (
+                     <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm mb-4 text-center font-medium border border-red-100">
+                         {error}
+                     </div>
+                 )}
+
+                 <form onSubmit={handlePasswordReset} className="space-y-4">
+                     <div>
+                         <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">New Secret Password</label>
+                         <div className="relative">
+                             <Lock size={16} className="absolute left-3 top-3 text-gray-400" />
+                             <input 
+                                 type="password" required 
+                                 value={newPassword} onChange={(e) => setNewPassword(e.target.value)}
+                                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a]/20 focus:border-[#1e3a8a] outline-none transition-all"
+                                 placeholder="Enter a strong password"
+                             />
+                         </div>
+                     </div>
+                     <div>
+                         <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Confirm Password</label>
+                         <div className="relative">
+                             <CheckCircle size={16} className="absolute left-3 top-3 text-gray-400" />
+                             <input 
+                                 type="password" required 
+                                 value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)}
+                                 className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a]/20 focus:border-[#1e3a8a] outline-none transition-all"
+                                 placeholder="Re-type your new password"
+                             />
+                         </div>
+                     </div>
+                     <button type="submit" className="w-full bg-[#1e3a8a] hover:bg-blue-900 text-white font-bold py-3 rounded-lg mt-6 shadow-lg shadow-blue-900/20 transition-all flex justify-center items-center gap-2">
+                         <Key size={18} /> Update Password & Continue
+                     </button>
+                 </form>
+             </div>
+          </div>
+      );
+  }
+
+  // ==========================================
+  // UI 2: THE NORMAL EMPLOYEE DASHBOARD
+  // ==========================================
   return (
     <DashboardLayout role="EMPLOYEE">
       
-      {/* --- 1. BREADCRUMB & WELCOME --- */}
+      {/* --- BREADCRUMB & WELCOME --- */}
       <div className="flex justify-between items-end mb-6 border-b border-gray-200 pb-4 p-4">
          <div>
             <div className="flex items-center gap-1 text-[10px] text-gray-500 uppercase tracking-wide mb-1">
@@ -151,7 +245,7 @@ const EmployeeDashboard = () => {
                   myAssets.map((asset) => (
                     <div key={asset.id} className={`border p-4 rounded hover:shadow-md transition-shadow relative ${asset.assignmentPending ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}`}>
                        <div className="absolute top-4 right-4 text-gray-200">
-                          {asset.assetName.toLowerCase().includes('phone') ? <Smartphone size={40}/> : <Laptop size={40}/>}
+                          {asset.assetName?.toLowerCase().includes('phone') ? <Smartphone size={40}/> : <Laptop size={40}/>}
                        </div>
                        <div className="flex justify-between items-start">
                            <div>
@@ -316,11 +410,11 @@ const EmployeeDashboard = () => {
                       <div>
                           <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Description / Issue</label>
                           <textarea 
-                             className="w-full border border-gray-300 rounded p-2 text-sm h-24"
-                             placeholder="Describe your issue or requirement..."
-                             value={ticketForm.description}
-                             onChange={(e) => setTicketForm({...ticketForm, description: e.target.value})}
-                             required
+                              className="w-full border border-gray-300 rounded p-2 text-sm h-24"
+                              placeholder="Describe your issue or requirement..."
+                              value={ticketForm.description}
+                              onChange={(e) => setTicketForm({...ticketForm, description: e.target.value})}
+                              required
                           ></textarea>
                       </div>
                       <div className="pt-2">

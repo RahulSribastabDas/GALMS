@@ -4,34 +4,31 @@ import DashboardLayout from '../components/DashboardLayout';
 import { 
   Building2, Plus, Coins, Layers, ArrowRight, 
   Package, Truck, Globe, Search, MoreHorizontal, AlertOctagon,
-  Users, UserPlus, Shield, Key // <-- Added some new icons for the User Modal
+  Users, UserPlus, Shield, Key, Mail // <-- ADDED Mail Icon
 } from 'lucide-react';
 
 const SuperAdminDashboard = () => {
-  // --- UI TOGGLES ---
   const [showDeptModal, setShowDeptModal] = useState(false);
-  const [showUserModal, setShowUserModal] = useState(false); // NEW toggle for user modal
+  const [showUserModal, setShowUserModal] = useState(false);
   const [selectedDept, setSelectedDept] = useState(null);
   
-  // --- STATE FOR REAL DATA ---
   const [departments, setDepartments] = useState([]);
-  const [deptUsers, setDeptUsers] = useState([]); // NEW state to hold users of a department
+  const [deptUsers, setDeptUsers] = useState([]); 
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- STATE FOR NEW DEPARTMENT FORM ---
   const [newDeptName, setNewDeptName] = useState('');
   const [newDeptRegion, setNewDeptRegion] = useState('');
   const [newDeptBudget, setNewDeptBudget] = useState('');
 
-  // --- STATE FOR NEW USER FORM ---
+  // --- ADDED EMAIL STATE ---
   const [newUsername, setNewUsername] = useState('');
+  const [newEmail, setNewEmail] = useState(''); // <-- NEW
   const [newPassword, setNewPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState('PROCUREMENT_OFFICER');
 
   const user = JSON.parse(localStorage.getItem('user'));
   const token = localStorage.getItem('token'); 
 
-  // --- 1. FETCH REAL DEPARTMENTS ---
   useEffect(() => {
     const fetchDepartments = async () => {
       try {
@@ -51,7 +48,6 @@ const SuperAdminDashboard = () => {
     }
   }, [token]);
 
-  // --- 2. CREATE NEW DEPARTMENT ---
   const handleCreateDepartment = async (e) => {
     e.preventDefault();
     try {
@@ -74,11 +70,10 @@ const SuperAdminDashboard = () => {
     }
   };
 
-  // --- 3. OPEN USER MODAL & FETCH USERS ---
   const handleManageUsers = async (dept) => {
     setSelectedDept(dept);
     setShowUserModal(true);
-    setDeptUsers([]); // Clear previous users while loading
+    setDeptUsers([]); 
     
     try {
       const response = await axios.get(`http://localhost:8080/api/users/department/${dept.id}`, {
@@ -90,26 +85,28 @@ const SuperAdminDashboard = () => {
     }
   };
 
-  // --- 4. CREATE NEW USER FOR DEPARTMENT ---
   const handleCreateUser = async (e) => {
     e.preventDefault();
     try {
       const response = await axios.post('http://localhost:8080/api/users', {
         username: newUsername,
+        email: newEmail, // <-- SEND EMAIL TO BACKEND
         password: newPassword,
         role: newUserRole,
-        departmentName: selectedDept.name, // Keep for backward compatibility
-        department: { id: selectedDept.id } // Map it securely to PostgreSQL
+        departmentName: selectedDept.name, 
+        department: { id: selectedDept.id } 
       }, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setDeptUsers([...deptUsers, response.data]); // Instantly update the list
+      setDeptUsers([...deptUsers, response.data]); 
       setNewUsername('');
+      setNewEmail(''); // Clear it!
       setNewPassword('');
+      alert("✅ Official Account Provisioned! Credentials have been emailed.");
     } catch (error) {
       console.error("Error creating user:", error);
-      alert("Failed to create user. Username might already be taken.");
+      alert(error.response?.data || "Failed to create user.");
     }
   };
 
@@ -285,7 +282,6 @@ const SuperAdminDashboard = () => {
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
               <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in duration-200">
                 
-                {/* Modal Header */}
                 <div className="bg-[#1b3a6b] text-white px-6 py-4 flex justify-between items-center shrink-0">
                   <div>
                     <h3 className="font-bold flex items-center gap-2"><Shield size={18}/> Access Control Center</h3>
@@ -350,6 +346,20 @@ const SuperAdminDashboard = () => {
                         />
                       </div>
 
+                      {/* --- NEW EMAIL INPUT --- */}
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Official Email Address</label>
+                        <div className="relative">
+                           <Mail size={14} className="absolute left-3 top-3 text-gray-400"/>
+                           <input 
+                             type="email" required
+                             value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
+                             className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 text-sm outline-none focus:border-blue-500"
+                             placeholder="e.g. official@gov.in"
+                           />
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-xs font-bold text-gray-700 mb-1">Secure Password</label>
                         <div className="relative">
@@ -364,7 +374,7 @@ const SuperAdminDashboard = () => {
                       </div>
 
                       <button type="submit" className="w-full bg-[#1b3a6b] hover:bg-blue-900 text-white font-bold py-2.5 rounded-lg shadow mt-2 transition-colors flex justify-center items-center gap-2">
-                         <UserPlus size={16}/> Create Account
+                         <UserPlus size={16}/> Create Account & Send Email
                       </button>
                     </form>
                   </div>

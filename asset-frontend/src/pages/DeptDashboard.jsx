@@ -4,19 +4,16 @@ import DashboardLayout from '../components/DashboardLayout';
 import { 
   Building2, Users, MonitorSmartphone, CheckCircle, 
   Send, UserPlus, AlertCircle, Wrench, CheckCircle2, XCircle,
-  Search, Filter, Download, ShieldCheck, Key
+  Search, Filter, Download, ShieldCheck, Key, Mail 
 } from 'lucide-react';
 
 const DeptDashboard = () => {
-  // --- UI STATE ---
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' or 'staff'
+  const [activeTab, setActiveTab] = useState('overview'); 
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- DATA STATE ---
   const [assets, setAssets] = useState([]);
   const [tickets, setTickets] = useState([]);
   
-  // --- MODAL & FORM STATE ---
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [targetUsername, setTargetUsername] = useState('');
@@ -24,9 +21,10 @@ const DeptDashboard = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 
-  // --- NEW: EMPLOYEE REGISTRATION STATE ---
+  // STATE: Includes email now
   const [newEmployee, setNewEmployee] = useState({
       username: '',
+      email: '', 
       password: ''
   });
 
@@ -34,7 +32,6 @@ const DeptDashboard = () => {
   const token = localStorage.getItem('token');
   const userDept = user?.department || 'SOFTWARE FORCE'; 
 
-  // --- 1. FETCH DATA (ASSETS & TICKETS) ---
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
@@ -62,7 +59,6 @@ const DeptDashboard = () => {
     if (token) fetchDashboardData();
   }, [token, userDept]);
 
-  // --- 2. ASSIGN ASSET ---
   const handleAssignAsset = async (e) => {
     e.preventDefault();
     if (!selectedAsset || !targetUsername) return;
@@ -81,7 +77,6 @@ const DeptDashboard = () => {
     }
   };
 
-  // --- 3. HANDLE TICKET ACTION ---
   const handleTicketAction = async (ticketId, newStatus) => {
       try {
           await axios.put(`http://localhost:8080/api/requests/${ticketId}/status?status=${newStatus}`, {}, {
@@ -95,30 +90,27 @@ const DeptDashboard = () => {
       }
   };
 
-  // --- 4. CREATE NEW EMPLOYEE ACCOUNT (UPDATED) ---
   const handleRegisterEmployee = async (e) => {
       e.preventDefault();
       try {
-          // Pointing to the correct /api/users endpoint from your UserController.java
           await axios.post('http://localhost:8080/api/users', {
               username: newEmployee.username,
+              email: newEmployee.email, // SENDING EMAIL TO BACKEND
               password: newEmployee.password,
               role: 'EMPLOYEE',
-              department: { name: userDept } // Binds them to the JS's department
+              department: { name: userDept } 
           }, {
-              // Added the token so Spring Boot security allows it!
               headers: { Authorization: `Bearer ${token}` } 
           });
           
-          alert(`✅ Secure account created for ${newEmployee.username}! They can now log in via the Employee portal.`);
-          setNewEmployee({ username: '', password: '' }); // Clear form
-      } catch (error) {
+          alert(`✅ Secure account created for ${newEmployee.username}! Credentials have been emailed.`);
+          setNewEmployee({ username: '', email: '', password: '' }); 
+      }  catch (error) {
           console.error("Error creating user:", error);
-          alert("Failed to create user. Ensure backend is running and username is unique.");
+          alert(error.response?.data || "Failed to create user.");
       }
   };
 
-  // --- FILTER & EXPORT LOGIC ---
   const filteredAssets = assets.filter(asset => {
       const matchesSearch = asset.assetName?.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             asset.assetId?.toLowerCase().includes(searchTerm.toLowerCase());
@@ -144,7 +136,6 @@ const DeptDashboard = () => {
     <DashboardLayout role="DEPT_HEAD">
       <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
         
-        {/* --- HEADER --- */}
         <div className="bg-[#1e3a8a] p-6 rounded-2xl shadow-lg text-white relative overflow-hidden">
           <div className="absolute top-0 right-0 p-16 bg-white/10 rounded-full -mr-10 -mt-10 blur-2xl"></div>
           <div className="relative z-10 flex justify-between items-end">
@@ -159,7 +150,6 @@ const DeptDashboard = () => {
           </div>
         </div>
 
-        {/* --- TAB NAVIGATION --- */}
         <div className="flex gap-2 border-b border-gray-200 pb-px">
             <button 
                 onClick={() => setActiveTab('overview')}
@@ -175,12 +165,8 @@ const DeptDashboard = () => {
             </button>
         </div>
 
-        {/* ========================================== */}
-        {/* TAB 1: OVERVIEW (INVENTORY & TICKETS)        */}
-        {/* ========================================== */}
         {activeTab === 'overview' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-300">
-                {/* LEFT COLUMN: AVAILABLE INVENTORY */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[600px]">
                   <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                     <div>
@@ -191,7 +177,6 @@ const DeptDashboard = () => {
                     </button>
                   </div>
 
-                  {/* SEARCH & FILTER TOOLBAR */}
                   <div className="bg-white p-4 border-b border-gray-100 flex gap-3">
                       <div className="relative flex-grow">
                           <Search size={16} className="absolute left-3 top-2.5 text-gray-400"/>
@@ -247,7 +232,6 @@ const DeptDashboard = () => {
                   </div>
                 </div>
 
-                {/* RIGHT COLUMN: TICKETS */}
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[600px]">
                   <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                     <h3 className="font-bold text-gray-800 flex items-center gap-2"><Wrench size={18} className="text-orange-500"/> Staff Service Requests</h3>
@@ -288,9 +272,6 @@ const DeptDashboard = () => {
             </div>
         )}
 
-        {/* ========================================== */}
-        {/* TAB 2: MANAGE STAFF (REGISTRATION)         */}
-        {/* ========================================== */}
         {activeTab === 'staff' && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden max-w-2xl mx-auto animate-in fade-in duration-300 mt-8">
                 <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex items-center gap-3">
@@ -324,6 +305,21 @@ const DeptDashboard = () => {
                             </div>
                         </div>
 
+                        {/* NEW INPUT FOR EMAIL ADDRESS */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Official Email Address</label>
+                            <div className="relative">
+                                <Mail size={18} className="absolute left-3 top-2.5 text-gray-400"/>
+                                <input 
+                                    type="email" required 
+                                    value={newEmployee.email}
+                                    onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
+                                    placeholder="e.g. employee@gov.in"
+                                    className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#1e3a8a]/20 focus:border-[#1e3a8a] transition-all"
+                                />
+                            </div>
+                        </div>
+
                         <div>
                             <label className="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wider">Temporary Password</label>
                             <div className="relative">
@@ -348,7 +344,6 @@ const DeptDashboard = () => {
             </div>
         )}
 
-        {/* --- MODAL: ASSIGN ASSET --- */}
         {showAssignModal && selectedAsset && (
             <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 backdrop-blur-sm">
                 <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
