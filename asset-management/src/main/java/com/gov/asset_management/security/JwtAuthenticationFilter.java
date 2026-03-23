@@ -20,6 +20,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     @Autowired
     private JwtUtils jwtUtils;
 
+    // --- THE FIX: EXPLICITLY IGNORE PUBLIC ROUTES ---
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String path = request.getRequestURI();
+        // If the frontend is asking for login/OTP or the public announcements, DO NOT check for a token.
+        return path.startsWith("/api/auth/") || path.equals("/api/announcements/public");
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -36,13 +44,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
                 // 4. Tell Spring Security: "This user is verified, let them in!"
                 UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(username, null, new ArrayList<>()); // Roles can be added in ArrayList later
+                        new UsernamePasswordAuthenticationToken(username, null, new ArrayList<>());
 
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
             }
         } catch (Exception e) {
-            System.out.println("Cannot set user authentication: " + e);
+            System.out.println("Cannot set user authentication: " + e.getMessage());
         }
 
         // Continue to the next step

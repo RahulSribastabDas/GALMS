@@ -36,4 +36,14 @@ public class User {
     public void setIsActive(Boolean isActive) {
         this.isActive = isActive;
     }
+    @Column(name = "first_login")
+    private Boolean firstLogin = true;
+
+    public Boolean getFirstLogin() {
+        return firstLogin;
+    }
+
+    public void setFirstLogin(Boolean firstLogin) {
+        this.firstLogin = firstLogin;
+    }
 }

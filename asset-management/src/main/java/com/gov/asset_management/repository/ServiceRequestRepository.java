@@ -10,7 +10,11 @@ public interface ServiceRequestRepository extends JpaRepository<ServiceRequest, 
     // 1. For Employee Dashboard
     List<ServiceRequest> findByEmployee_Username(String username);
 
-    // 2. For Procurement Dashboard (NEW)
+    // 2. For Procurement Dashboard
     // Finds tickets that are 'SUBMITTED' (not yet processed) and are 'REQUISITION' type
     List<ServiceRequest> findByStatusAndType(String status, RequestType type);
+
+    // 3. For Department Head Dashboard (NEW)
+    // Fetches all tickets with a specific status (e.g., 'SUBMITTED') so the Dept Head can see Maintenance/Return requests
+    List<ServiceRequest> findByStatus(String status);
 }

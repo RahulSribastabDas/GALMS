@@ -1,6 +1,6 @@
 package com.gov.asset_management.controller;
 
-import com.gov.asset_management.model.RequestType; // <-- Added this import
+import com.gov.asset_management.model.RequestType;
 import com.gov.asset_management.model.ServiceRequest;
 import com.gov.asset_management.model.User;
 import com.gov.asset_management.repository.ServiceRequestRepository;
@@ -72,7 +72,7 @@ public class ServiceRequestController {
         return repo.findByEmployee_Username(username);
     }
 
-    // --- NEW: FOR PROCUREMENT OFFICER ---
+    // --- FOR PROCUREMENT OFFICER ---
     // Fetches ONLY "REQUISITION" tickets that are newly "SUBMITTED"
     @GetMapping("/pending-requisitions")
     public ResponseEntity<List<ServiceRequest>> getPendingRequisitions() {
@@ -82,7 +82,17 @@ public class ServiceRequestController {
         );
         return ResponseEntity.ok(pendingReqs);
     }
-    // --- 5. UPDATE TICKET STATUS (e.g., Mark as CLOSED) ---
+
+    // --- NEW: FOR DEPARTMENT HEAD ---
+    // Fetches all pending tickets (Frontend will filter for Maintenance/Return)
+    @GetMapping("/pending")
+    public ResponseEntity<List<ServiceRequest>> getPendingRequests() {
+        // Fetches all tickets with status "SUBMITTED"
+        List<ServiceRequest> pendingReqs = repo.findByStatus("SUBMITTED");
+        return ResponseEntity.ok(pendingReqs);
+    }
+
+    // --- UPDATE TICKET STATUS (e.g., Mark as CLOSED, APPROVED, REJECTED) ---
     @PutMapping("/{id}/status")
     public ResponseEntity<?> updateTicketStatus(@PathVariable Long id, @RequestParam String status) {
         ServiceRequest request = repo.findById(id).orElse(null);
