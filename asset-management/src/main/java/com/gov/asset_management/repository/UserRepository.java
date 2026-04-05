@@ -13,4 +13,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     // --- NEW: Find all users for a specific department ---
     List<User> findByDepartmentId(Long departmentId);
+    // --- NEW: Find users pending admin approval ---
+    List<User> findByIsActiveFalse();
 }
