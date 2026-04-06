@@ -14,6 +14,8 @@ import CAGDashboard from './pages/CAGDashboard';
 import PODashboard from './pages/PODashboard'; 
 import DeptDashboard from './pages/DeptDashboard'; 
 import EmployeeDashboard from './pages/EmployeeDashboard';
+import TrackingDashboard from './pages/TrackingDashboard';
+import ProcurementForm from './pages/ProcurementForm';
 
 function App() {
   return (
@@ -29,7 +31,9 @@ function App() {
       {/* --- SECURE ROUTES --- */}
       <Route path="/super-admin" element={<SuperAdminDashboard />} />
       <Route path="/cag-dashboard" element={<CAGDashboard />} />
+      <Route path="/tracking" element={<TrackingDashboard />} />
       <Route path="/po-dashboard" element={<PODashboard />} />
+      <Route path="/procurement/new" element={<ProcurementForm />} />
       <Route path="/dept-dashboard" element={<DeptDashboard />} />
       <Route path="/employee" element={<EmployeeDashboard />} />
 
