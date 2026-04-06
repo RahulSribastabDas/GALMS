@@ -52,7 +52,7 @@ public class UserController {
             }
 
             // 3. Set secure defaults
-            newUser.setIsActive(true);
+            newUser.setIsActive(false); // Forces them to wait for Admin approval
             newUser.setFirstLogin(true);
 
             // 4. Save to Database

@@ -16,23 +16,37 @@ public class DepartmentController {
     @Autowired
     private DepartmentRepository departmentRepository;
 
-    // --- API TO GET ALL DEPARTMENTS ---
+    // --- 1. GET ALL DEPARTMENTS ---
     @GetMapping
-    public ResponseEntity<List<Department>> getAllDepartments() {
-        // Fetch everything from the PostgreSQL 'department' table
-        List<Department> departments = departmentRepository.findAll();
-
-        // Send it back as a JSON list
-        return ResponseEntity.ok(departments);
+    public ResponseEntity<?> getAllDepartments() {
+        try {
+            List<Department> departments = departmentRepository.findAll();
+            return ResponseEntity.ok(departments);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error fetching departments: " + e.getMessage());
+        }
     }
-    // --- API TO CREATE A NEW DEPARTMENT ---
-    @PostMapping
-    public ResponseEntity<Department> createDepartment(@RequestBody Department department) {
-        // Ensure default values are set if React sends them empty
-        if (department.getUsedBudget() == null) department.setUsedBudget(0.0);
-        if (department.getUnverifiedAssetsCount() == null) department.setUnverifiedAssetsCount(0);
 
-        Department savedDepartment = departmentRepository.save(department);
-        return ResponseEntity.ok(savedDepartment);
+    // --- 2. CREATE A NEW DEPARTMENT ---
+    @PostMapping
+    public ResponseEntity<?> createDepartment(@RequestBody Department department) {
+        try {
+            // Check if it already exists to prevent a messy database crash
+            Department existingDept = departmentRepository.findByName(department.getName());
+            if (existingDept != null) {
+                return ResponseEntity.status(400).body("Error: Department '" + department.getName() + "' already exists.");
+            }
+
+            // Save to database
+            Department savedDepartment = departmentRepository.save(department);
+
+            return ResponseEntity.ok(savedDepartment);
+
+        } catch (Exception e) {
+            // If it crashes, this prints the REAL reason in red text in your IntelliJ console
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Server Error: " + e.getMessage());
+        }
     }
 }
