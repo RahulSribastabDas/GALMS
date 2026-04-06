@@ -1,11 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+@import 'leaflet/dist/leaflet.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 body {
   font-family: 'Roboto', sans-serif;
-  background-color: #f0f2f5; /* Standard Govt Grey */
+  background-color: #f0f2f5;
+}
+
+.leaflet-container {
+  height: 100%;
+  width: 100%;
+  border-radius: 0.75rem;
 }
 
 /* The Official Tricolor Border */

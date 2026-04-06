@@ -1,18 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { Shield, Server, TrendingUp, Users, ArrowRight, BookOpen, Bell, HelpCircle } from 'lucide-react';
 
 const PublicHome = () => {
   const navigate = useNavigate();
 
+  // --- LIVE ANNOUNCEMENTS STATE ---
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [liveAnnouncements, setLiveAnnouncements] = useState([]);
+
+  // --- FETCH ANNOUNCEMENTS FROM POSTGRESQL ---
+  useEffect(() => {
+      const fetchAnnouncements = async () => {
+          try {
+              const response = await axios.get('http://localhost:8080/api/announcements/public');
+              setLiveAnnouncements(response.data);
+          } catch (error) {
+              console.error("Could not fetch announcements:", error);
+              setLiveAnnouncements([
+                  { id: 0, type: "INFO", title: "System Connection", date: new Date().toLocaleDateString(), text: "Unable to connect to database." }
+              ]);
+          }
+      };
+      fetchAnnouncements();
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
       
-      {/* --- TOP HEADER (Your existing Navbar) --- */}
-      <header className="bg-[#0b1e3c] text-white shadow-md z-50">
+      {/* --- TOP HEADER --- */}
+      <header className="bg-[#0b1e3c] text-white shadow-md z-50 relative">
         <div className="container mx-auto px-6 py-3 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            {/* Placeholder for State Emblem of India */}
             <div className="w-10 h-12 border-2 border-yellow-500 rounded flex items-center justify-center text-yellow-500 font-bold text-xs text-center p-1">
               सत्यमेव जयते
             </div>
@@ -23,12 +43,50 @@ const PublicHome = () => {
           </div>
           
           {/* FUNCTIONAL NAVIGATION LINKS */}
-          <nav className="hidden md:flex gap-6 text-sm font-medium text-blue-100">
+          <nav className="hidden md:flex gap-6 text-sm font-medium text-blue-100 items-center">
             <button onClick={() => navigate('/')} className="hover:text-white transition-colors border-b-2 border-orange-500 pb-1">Home</button>
             <button onClick={() => navigate('/about')} className="hover:text-white transition-colors">About GALMS</button>
-            <button onClick={() => navigate('/notifications')} className="hover:text-white transition-colors flex items-center gap-1">
-              Notifications <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full animate-pulse">New</span>
-            </button>
+            
+            {/* --- LIVE NOTIFICATION DROPDOWN --- */}
+            <div className="relative">
+                <button 
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className={`flex items-center gap-1.5 transition-colors ${showNotifications ? 'text-white' : 'hover:text-white'}`}
+                >
+                    Notifications 
+                    <span className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 rounded-full animate-pulse shadow-sm font-bold">
+                        {liveAnnouncements.length}
+                    </span>
+                </button>
+
+                {showNotifications && (
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-4 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden animate-in slide-in-from-top-2 duration-200 text-left">
+                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex justify-between items-center text-black">
+                            <h4 className="text-gray-800 font-bold text-sm flex items-center gap-2"><Bell size={14}/> System Updates</h4>
+                            <button onClick={() => setShowNotifications(false)} className="text-gray-400 hover:text-gray-800 text-lg leading-none font-bold">✕</button>
+                        </div>
+                        <div className="max-h-72 overflow-y-auto">
+                            {liveAnnouncements.length === 0 ? (
+                                <div className="p-4 text-center text-gray-500 text-sm italic">No new notifications.</div>
+                            ) : (
+                                liveAnnouncements.map(notif => (
+                                    <div key={notif.id} className="p-4 border-b border-gray-50 hover:bg-blue-50/50 transition-colors cursor-pointer group text-left">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${notif.type === 'ALERT' ? 'bg-red-100 text-red-700' : notif.type === 'INFO' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
+                                                {notif.type}
+                                            </span>
+                                            <span className="text-[10px] text-gray-400 font-medium">{notif.date}</span>
+                                        </div>
+                                        <h5 className="text-xs font-bold text-gray-800 group-hover:text-[#1e3a8a] mb-1">{notif.title}</h5>
+                                        <p className="text-[11px] text-gray-600 line-clamp-2">{notif.text}</p>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+
             <button onClick={() => navigate('/manual')} className="hover:text-white transition-colors">User Manual</button>
             <button onClick={() => navigate('/directory')} className="hover:text-white transition-colors">Department Directory</button>
           </nav>
@@ -42,7 +100,6 @@ const PublicHome = () => {
       {/* --- HERO SECTION --- */}
       <main className="flex-grow">
         <div className="bg-gradient-to-br from-[#0b1e3c] to-[#1a365d] text-white py-20 relative overflow-hidden">
-          {/* Subtle background pattern */}
           <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white via-transparent to-transparent"></div>
           
           <div className="container mx-auto px-6 relative z-10 grid md:grid-cols-2 gap-12 items-center">
@@ -59,21 +116,21 @@ const PublicHome = () => {
               
               <div className="flex gap-4">
                 <button 
-                  onClick={() => navigate('/login')} // Redirects to your existing login page
-                  className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg flex items-center gap-2 transition-transform hover:scale-105"
+                  onClick={() => navigate('/login')}
+                  className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-bold shadow-lg flex items-center gap-2 transition-transform hover:scale-105 z-0"
                 >
                   Secure Login Portal <ArrowRight size={18} />
                 </button>
                 <button 
                   onClick={() => navigate('/about')}
-                  className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-8 py-3 rounded-lg font-bold backdrop-blur-sm transition-colors"
+                  className="bg-white/10 hover:bg-white/20 border border-white/20 text-white px-8 py-3 rounded-lg font-bold backdrop-blur-sm transition-colors z-0"
                 >
                   Read the Mandate
                 </button>
               </div>
             </div>
 
-            {/* Live Global Statistics (Read-only for public) */}
+            {/* Live Global Statistics */}
             <div className="bg-white/10 backdrop-blur-md border border-white/20 p-8 rounded-2xl shadow-2xl">
               <h3 className="text-sm font-bold uppercase tracking-widest text-blue-200 mb-6 border-b border-white/20 pb-2">National Asset Overview</h3>
               <div className="grid grid-cols-2 gap-6">
